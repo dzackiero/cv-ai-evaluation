@@ -60,15 +60,15 @@ export class EvaluationsService {
     }
   }
 
-  async evaluateCv(documentId: string, jobId?: string) {
+  async evaluateCv(documentId: string, jobTitle: string, jobId?: string) {
     const [cvData, scoringRubric, jobDescription] = await Promise.all([
       this.extractDocumentToStructure(documentId, curriculumVitaeSchema),
       this.internalDocumentsService.queryInternalDocuments(
-        'Scoring Rubric for Evaluating CV',
+        `Scoring Rubric for Evaluating CV for ${jobTitle}`,
         'scoring_rubric',
       ),
       this.internalDocumentsService.queryInternalDocuments(
-        'Job Description for Product Engineer (Backend)',
+        `Job Description for ${jobTitle}`,
         'project_brief',
       ),
     ]);
@@ -118,15 +118,15 @@ export class EvaluationsService {
     return { ...evaluation };
   }
 
-  async evaluateProject(documentId: string, jobId?: string) {
+  async evaluateProject(documentId: string, jobTitle: string, jobId?: string) {
     const [projectData, scoringRubric, studyBrief] = await Promise.all([
       this.extractDocumentToStructure(documentId, projectReportSchema),
       this.internalDocumentsService.queryInternalDocuments(
-        'Scoring Rubric for Evaluating Project Deliverables',
+        `Scoring Rubric for Evaluating Project Deliverables for ${jobTitle}`,
         'scoring_rubric',
       ),
       this.internalDocumentsService.queryInternalDocuments(
-        'Case Study Brief',
+        `Case Study Brief for ${jobTitle}`,
         'case_study_brief',
       ),
     ]);
@@ -179,14 +179,15 @@ export class EvaluationsService {
   async overallEvaluation(
     cvDocumentId: string,
     projectDocumentId: string,
+    jobTitle: string,
     jobId: string,
   ) {
     this.logger.log(
       `[Evaluation] Starting combined evaluation for job: ${jobId}`,
     );
     const [cvEvaluation, projectEvaluation] = await Promise.all([
-      this.evaluateCv(cvDocumentId, jobId),
-      this.evaluateProject(projectDocumentId, jobId),
+      this.evaluateCv(cvDocumentId, jobTitle, jobId),
+      this.evaluateProject(projectDocumentId, jobTitle, jobId),
     ]);
 
     const overallRubric =

@@ -14,9 +14,6 @@ export class EvaluationJobsService {
     @InjectQueue('evaluation-queue') private evaluationQueue: Queue,
   ) {}
 
-  /**
-   * Create a new evaluation job and queue it for processing
-   */
   async createAndQueueJob(data: {
     cvDocumentId: string;
     projectDocumentId: string;

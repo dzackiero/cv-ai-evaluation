@@ -7,6 +7,7 @@ import { EvaluationsService } from './services/evaluations.service';
 import { DocumentStorageService } from './services/document-storage.service';
 import { EvaluationJobsService } from './services/evaluation-jobs.service';
 import { EvaluationProcessor } from './processors/evaluation.processor';
+import { TestEvaluationsController } from './controllers/test-evaluations.controller';
 
 @Module({
   imports: [
@@ -14,7 +15,11 @@ import { EvaluationProcessor } from './processors/evaluation.processor';
       name: 'evaluation-queue',
     }),
   ],
-  controllers: [EvaluationsController, InternalDocumentsController],
+  controllers: [
+    EvaluationsController,
+    InternalDocumentsController,
+    TestEvaluationsController,
+  ],
   providers: [
     InternalDocumentsService,
     EvaluationsService,

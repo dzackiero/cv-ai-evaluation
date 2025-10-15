@@ -35,6 +35,7 @@ export class EvaluationProcessor extends WorkerHost {
       const overallResult = await this.evaluationsService.overallEvaluation(
         cvDocumentId,
         projectDocumentId,
+        jobTitle,
         jobId,
       );
 
