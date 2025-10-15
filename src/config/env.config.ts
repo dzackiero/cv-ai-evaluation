@@ -52,14 +52,7 @@ class EnvironmentVariables {
 
   // Redis
   @IsString()
-  REDIS_HOST: string;
-
-  @IsNumber()
-  REDIS_PORT: number;
-
-  @IsString()
-  @IsOptional()
-  REDIS_PASSWORD?: string;
+  REDIS_URL: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
