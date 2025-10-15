@@ -5,7 +5,6 @@ import {
   Post,
   Query,
   UploadedFile,
-  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
 import {
@@ -13,10 +12,7 @@ import {
   InternalDocumentsService,
 } from './services/internal-documents.service';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
-import {
-  FileFieldsInterceptor,
-  FileInterceptor,
-} from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadInternalDocumentsDto } from './dto/upload-internal-documents.dto';
 import { EvaluationsService } from './services/evaluations.service';
 
@@ -52,17 +48,11 @@ export class EvaluationsController {
     return this.internalDocumentsService.queryInternalDocuments(query, filter);
   }
 
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'cvDocument', maxCount: 1 },
-      { name: 'projectDocument', maxCount: 1 },
-    ]),
-  )
-  @Post('evaluate-candidate')
+  @UseInterceptors(FileInterceptor('cvDocument'))
+  @Post('evaluate/cv')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description:
-      'Evaluate a candidate with CV and project documents (PDF format)',
+    description: 'Upload CV and project documents (PDF format)',
     schema: {
       type: 'object',
       properties: {
@@ -71,25 +61,11 @@ export class EvaluationsController {
           format: 'binary',
           description: 'CV document in PDF format',
         },
-        projectDocument: {
-          type: 'string',
-          format: 'binary',
-          description: 'Project document in PDF format',
-        },
       },
-      required: ['cvDocument', 'projectDocument'],
+      required: ['cvDocument'],
     },
   })
-  async evaluateCandidate(
-    @UploadedFiles()
-    files: {
-      cvDocument: Express.Multer.File[];
-      projectDocument: Express.Multer.File[];
-    },
-  ) {
-    return this.evaluationsService.evaluateCandidate(
-      files.cvDocument[0],
-      files.projectDocument[0],
-    );
+  async evaluateCv(@UploadedFile() file: Express.Multer.File) {
+    return await this.evaluationsService.evaluateCv(file);
   }
 }
