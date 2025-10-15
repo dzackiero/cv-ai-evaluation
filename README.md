@@ -101,7 +101,54 @@ pm2 startup
 
 ### Using Docker/Podman
 
-First, ensure Docker or Podman is installed on your system. Then build and run:
+First, ensure Docker or Podman is installed on your system. write a `Dockerfile`:
+
+```Dockerfile
+# Build stage
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy dependency files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build application
+RUN pnpm run build
+
+# Production stage
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy dependency files
+COPY package.json pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["node", "dist/main.js"]
+```
+
+Then build and run:
 
 ```bash
 # Build the image (use 'docker' or 'podman')
@@ -125,7 +172,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - '3000:3000'
     env_file:
       - .env
     restart: unless-stopped
