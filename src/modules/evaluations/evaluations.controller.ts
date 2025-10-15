@@ -98,7 +98,7 @@ export class EvaluationsController {
       { name: 'projectDocument', maxCount: 1 },
     ]),
   )
-  @Post('evaluate/final')
+  @Post('evaluate')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
@@ -120,7 +120,7 @@ export class EvaluationsController {
       required: ['cvDocument', 'projectDocument'],
     },
   })
-  async finalEvaluation(
+  async evaluation(
     @UploadedFiles()
     files: {
       cvDocument: Express.Multer.File[];

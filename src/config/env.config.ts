@@ -44,6 +44,16 @@ class EnvironmentVariables {
 
   @IsString()
   QDRANT_URL: string;
+
+  // Supabase
+  @IsString()
+  SUPABASE_PROJECT_ID: string;
+
+  @IsString()
+  SUPABASE_URL: string;
+
+  @IsString()
+  SUPABASE_SERVICE_KEY: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
