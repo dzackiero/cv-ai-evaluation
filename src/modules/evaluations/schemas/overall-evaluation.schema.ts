@@ -1,24 +1,21 @@
 import { z } from 'zod';
 
-const OverallCriteriaSchema = z.object({
-  criteria: z.string().describe('The name of the overall evaluation criteria'),
-  score: z
-    .number()
-    .nullable()
-    .describe(
-      'The score for the overall criteria if the criteria is score type, null otherwise',
-    ),
-  description: z
-    .string()
-    .nullable()
-    .describe(
-      'The description of the overall criteria if the criteria is description type, null otherwise',
-    ),
-  calculation: z.string().describe('How the overall score is calculated'),
-});
-
 export const OverallEvaluationSchema = z.object({
-  overallCriterias: z
-    .array(OverallCriteriaSchema)
-    .describe('List of overall evaluation criterias'),
+  cv_match_rate: z
+    .number()
+    .describe('The score of the CV matching from cv evaluation'),
+  cv_feedback: z.string().describe('The feedback from cv evaluation'),
+  cv_calculation_details: z
+    .string()
+    .describe('The calculation details from cv evaluation'),
+  project_score: z
+    .number()
+    .describe('The score of the project from project evaluation'),
+  project_feedback: z.string().describe('The feedback from project evaluation'),
+  project_calculation_details: z
+    .string()
+    .describe('The calculation details from project evaluation'),
+  overall_summary: z
+    .string()
+    .describe('The overall summary of the candidate based on evaluations'),
 });
