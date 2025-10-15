@@ -5,7 +5,7 @@ import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { ConfigService } from '@nestjs/config';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import { TempFileManager } from '../../../utils/temp-file.util';
-import { DocumentType } from 'src/modules/types/document-type.enum';
+import { DocumentType } from 'src/modules/evaluations/types/document-type.enum';
 
 @Injectable()
 export class InternalDocumentsService {

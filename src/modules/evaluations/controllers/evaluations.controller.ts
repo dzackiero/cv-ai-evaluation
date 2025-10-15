@@ -9,12 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DocumentStorageService } from './services/document-storage.service';
-import { EvaluationJobsService } from './services/evaluation-jobs.service';
-import { EvaluationsService } from './services/evaluations.service';
-import { UploadDocumentDto } from './dto/upload-document.dto';
-import { CreateEvaluationDto } from './dto/create-evaluation.dto';
-import { TestEvaluationDto } from './dto/test-evaluation.dto';
+import { DocumentStorageService } from '../services/document-storage.service';
+import { EvaluationJobsService } from '../services/evaluation-jobs.service';
+import { EvaluationsService } from '../services/evaluations.service';
+import { UploadDocumentDto } from '../dto/upload-document.dto';
+import { CreateEvaluationDto } from '../dto/create-evaluation.dto';
+import { TestEvaluationDto } from '../dto/test-evaluation.dto';
 
 @ApiTags('evaluations')
 @Controller()
@@ -25,9 +25,6 @@ export class EvaluationsController {
     private readonly evaluationsService: EvaluationsService,
   ) {}
 
-  /**
-   * Upload document endpoint
-   */
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -57,9 +54,6 @@ export class EvaluationsController {
     return await this.documentStorageService.uploadDocument(file, dto.type);
   }
 
-  /**
-   * Start evaluation with document IDs
-   */
   @Post('evaluate')
   @ApiBody({
     description: 'Start evaluation with uploaded document IDs and job title',
@@ -69,27 +63,18 @@ export class EvaluationsController {
     return await this.evaluationJobsService.createAndQueueJob(dto);
   }
 
-  /**
-   * Get evaluation result by job ID
-   */
   @Get('result/:id')
   async getEvaluationResult(@Param('id') id: string) {
     return await this.evaluationJobsService.getJobStatus(id);
   }
 
-  /**
-   * Test CV evaluation with document ID
-   */
   @Post('test/cv')
   @ApiBody({
     description: 'Test CV evaluation',
     type: TestEvaluationDto,
   })
   async testCvEvaluation(@Body() dto: TestEvaluationDto) {
-    const result = await this.evaluationsService.evaluateCv(
-      dto.documentId,
-      'test-job',
-    );
+    const result = await this.evaluationsService.evaluateCv(dto.documentId);
 
     return {
       documentId: dto.documentId,
@@ -97,9 +82,6 @@ export class EvaluationsController {
     };
   }
 
-  /**
-   * Test project evaluation with document ID
-   */
   @Post('test/project')
   @ApiBody({
     description: 'Test project evaluation',
@@ -108,7 +90,6 @@ export class EvaluationsController {
   async testProjectEvaluation(@Body() dto: TestEvaluationDto) {
     const result = await this.evaluationsService.evaluateProject(
       dto.documentId,
-      'test-job',
     );
 
     return {

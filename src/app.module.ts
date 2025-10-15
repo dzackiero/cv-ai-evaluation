@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import validateEnv from './config/env.config';
 import { CommonModule } from './common/common.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -11,6 +12,16 @@ import { CommonModule } from './common/common.module';
       isGlobal: true,
       validate: validateEnv,
       envFilePath: '.env',
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get('REDIS_HOST'),
+          port: configService.get('REDIS_PORT'),
+          password: configService.get('REDIS_PASSWORD'),
+        },
+      }),
     }),
     CommonModule,
 

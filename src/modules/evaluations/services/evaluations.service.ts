@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InternalDocumentsService } from './internal-documents.service';
+import { DocumentStorageService } from './document-storage.service';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { ChatOpenAI } from '@langchain/openai';
 import { curriculumVitaeSchema } from '../schemas/curriculum-vitae.schema';
 import { EvaluationSchema } from '../schemas/evaluations.schema';
 import { projectReportSchema } from '../schemas/project-report.schema';
 import { OverallEvaluationSchema } from '../schemas/overall-evaluation.schema';
-import z, { ZodSchema } from 'zod';
-import { TempFileManager } from '../../../utils/temp-file.util';
+import { ZodSchema } from 'zod';
+import { SupabaseService } from '../../../common/services/supabase.service';
+import { EvaluationStatus } from '../types/status.enum';
+import { EvaluationType } from '../types/evaluation-type.enum';
 
 @Injectable()
 export class EvaluationsService {
@@ -15,24 +18,29 @@ export class EvaluationsService {
 
   constructor(
     private readonly internalDocumentsService: InternalDocumentsService,
+    private readonly documentStorageService: DocumentStorageService,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   async extractDocumentToStructure<T extends ZodSchema>(
-    document: Express.Multer.File,
+    documentId: string,
     schema: T,
-  ): Promise<z.infer<T>> {
-    return await TempFileManager.withTempFile(
-      document,
-      'document',
-      async (tempFilePath) => {
-        const documentLoader = new PDFLoader(tempFilePath);
-        const doc = (await documentLoader.load())
-          .map((doc) => doc.pageContent)
-          .join('\n\n');
+  ): Promise<T> {
+    let tempFilePath: string | null = null;
+    try {
+      const storagePath =
+        await this.documentStorageService.getDocumentStoragePath(documentId);
+      tempFilePath =
+        await this.documentStorageService.downloadToTempFile(storagePath);
 
-        const model = new ChatOpenAI({ model: 'gpt-4o-mini' });
-        const structuredModel = model.withStructuredOutput(schema);
-        const docAnalysis = (await structuredModel.invoke(`
+      const documentLoader = new PDFLoader(tempFilePath);
+      const doc = (await documentLoader.load())
+        .map((doc) => doc.pageContent)
+        .join('\n\n');
+
+      const model = new ChatOpenAI({ model: 'gpt-4o-mini' });
+      const structuredModel = model.withStructuredOutput(schema);
+      const docAnalysis = (await structuredModel.invoke(`
           You are a precise information extraction system.
 
           Extract and structure the following document content according to the provided schema **exactly**.
@@ -44,18 +52,17 @@ export class EvaluationsService {
           Document Content:
           ${doc}
         `)) as T;
-        return docAnalysis;
-      },
-    );
+      return docAnalysis;
+    } finally {
+      if (tempFilePath) {
+        this.documentStorageService.deleteTempFile(tempFilePath);
+      }
+    }
   }
 
-  async evaluateCv(document: Express.Multer.File) {
-    this.logger.log(
-      `[CV Evaluation] Starting evaluation: ${document.originalname}`,
-    );
-
+  async evaluateCv(documentId: string, jobId?: string) {
     const [cvData, scoringRubric, jobDescription] = await Promise.all([
-      this.extractDocumentToStructure(document, curriculumVitaeSchema),
+      this.extractDocumentToStructure(documentId, curriculumVitaeSchema),
       this.internalDocumentsService.queryInternalDocuments(
         'Scoring Rubric for Evaluating CV',
         'scoring_rubric',
@@ -99,19 +106,21 @@ export class EvaluationsService {
       Provide a complete structured evaluation strictly following the schema, reflecting a fair but **critical assessment** of the candidate's real fit.
     `);
 
-    this.logger.log(
-      `[CV Evaluation] Completed evaluation: ${document.originalname}`,
-    );
+    if (jobId) {
+      this.logger.log(`[CV Evaluation] Completed evaluation for job: ${jobId}`);
+      await this.createEvaluationRecord(
+        jobId,
+        EvaluationType.CV,
+        evaluation,
+        documentId,
+      );
+    }
     return { ...evaluation };
   }
 
-  async evaluateProject(document: Express.Multer.File) {
-    this.logger.log(
-      `[Project Evaluation] Starting evaluation: ${document.originalname}`,
-    );
-
+  async evaluateProject(documentId: string, jobId?: string) {
     const [projectData, scoringRubric, studyBrief] = await Promise.all([
-      this.extractDocumentToStructure(document, projectReportSchema),
+      this.extractDocumentToStructure(documentId, projectReportSchema),
       this.internalDocumentsService.queryInternalDocuments(
         'Scoring Rubric for Evaluating Project Deliverables',
         'scoring_rubric',
@@ -153,22 +162,31 @@ export class EvaluationsService {
       Provide the evaluation as per the schema.
     `);
 
-    this.logger.log(
-      `[Project Evaluation] Completed evaluation: ${document.originalname}`,
-    );
+    if (jobId) {
+      this.logger.log(
+        `[Project Evaluation] Completed evaluation for job: ${jobId}`,
+      );
+      await this.createEvaluationRecord(
+        jobId,
+        EvaluationType.PROJECT,
+        evaluation,
+        documentId,
+      );
+    }
     return { projectData, evaluation };
   }
 
-  async evaluation(
-    cvDocument: Express.Multer.File,
-    projectDocument: Express.Multer.File,
+  async overallEvaluation(
+    cvDocumentId: string,
+    projectDocumentId: string,
+    jobId: string,
   ) {
     this.logger.log(
-      `[Evaluation] Starting combined evaluation for CV and Project`,
+      `[Evaluation] Starting combined evaluation for job: ${jobId}`,
     );
     const [cvEvaluation, projectEvaluation] = await Promise.all([
-      this.evaluateCv(cvDocument),
-      this.evaluateProject(projectDocument),
+      this.evaluateCv(cvDocumentId, jobId),
+      this.evaluateProject(projectDocumentId, jobId),
     ]);
 
     const overallRubric =
@@ -177,7 +195,9 @@ export class EvaluationsService {
         'scoring_rubric',
       );
 
-    this.logger.log(`[Evaluation] Computing final overall score`);
+    this.logger.log(
+      `[Evaluation] Computing final overall score for job: ${jobId}`,
+    );
     const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
     const structuredModel = model.withStructuredOutput(OverallEvaluationSchema);
     const finalEvaluation = await structuredModel.invoke(`
@@ -204,7 +224,43 @@ export class EvaluationsService {
       Provide the evaluation in strict JSON according to the schema.
     `);
 
-    this.logger.log(`[Evaluation] Completed combined evaluation`);
+    this.logger.log(
+      `[Evaluation] Completed combined evaluation for job: ${jobId}`,
+    );
+
+    // Create overall evaluation record in database
+    await this.createEvaluationRecord(
+      jobId,
+      EvaluationType.OVERALL,
+      finalEvaluation,
+    );
+
     return { result: finalEvaluation };
+  }
+
+  /**
+   * Create evaluation record in database
+   */
+  async createEvaluationRecord(
+    jobId: string,
+    type: string,
+    evaluationData: Record<string, any>,
+    documentId?: string,
+  ): Promise<void> {
+    const { error } = await this.supabaseService.client
+      .from('evaluations')
+      .insert({
+        job_id: jobId,
+        type,
+        status: EvaluationStatus.COMPLETED,
+        data: evaluationData,
+        document_id: documentId,
+        finished_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      this.logger.error(`Failed to create evaluation record: ${error.message}`);
+      throw new Error(`Failed to create evaluation record: ${error.message}`);
+    }
   }
 }

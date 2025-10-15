@@ -18,12 +18,15 @@ export type Database = {
         Row: {
           created_at: string;
           cv_calculation_detail: string | null;
+          cv_document_id: string | null;
           cv_feedback: string | null;
           cv_match_rate: number | null;
-          finished_at: string;
+          finished_at: string | null;
           id: string;
+          job_title: string | null;
           overall_summary: string | null;
           project_calculation_detail: string | null;
+          project_document_id: string | null;
           project_feedback: string | null;
           project_score: number | null;
           status: string;
@@ -32,12 +35,15 @@ export type Database = {
         Insert: {
           created_at?: string;
           cv_calculation_detail?: string | null;
+          cv_document_id?: string | null;
           cv_feedback?: string | null;
           cv_match_rate?: number | null;
-          finished_at: string;
+          finished_at?: string | null;
           id?: string;
+          job_title?: string | null;
           overall_summary?: string | null;
           project_calculation_detail?: string | null;
+          project_document_id?: string | null;
           project_feedback?: string | null;
           project_score?: number | null;
           status?: string;
@@ -46,23 +52,42 @@ export type Database = {
         Update: {
           created_at?: string;
           cv_calculation_detail?: string | null;
+          cv_document_id?: string | null;
           cv_feedback?: string | null;
           cv_match_rate?: number | null;
-          finished_at?: string;
+          finished_at?: string | null;
           id?: string;
+          job_title?: string | null;
           overall_summary?: string | null;
           project_calculation_detail?: string | null;
+          project_document_id?: string | null;
           project_feedback?: string | null;
           project_score?: number | null;
           status?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'evaluation_jobs_cv_document_id_fkey';
+            columns: ['cv_document_id'];
+            isOneToOne: false;
+            referencedRelation: 'uploaded_documents';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'evaluation_jobs_project_document_id_fkey';
+            columns: ['project_document_id'];
+            isOneToOne: false;
+            referencedRelation: 'uploaded_documents';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       evaluations: {
         Row: {
           created_at: string;
           data: Json | null;
+          document_id: string | null;
           finished_at: string | null;
           id: string;
           job_id: string;
@@ -73,6 +98,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           data?: Json | null;
+          document_id?: string | null;
           finished_at?: string | null;
           id?: string;
           job_id: string;
@@ -83,6 +109,7 @@ export type Database = {
         Update: {
           created_at?: string;
           data?: Json | null;
+          document_id?: string | null;
           finished_at?: string | null;
           id?: string;
           job_id?: string;
@@ -92,6 +119,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: 'evaluations_document_id_fkey';
+            columns: ['document_id'];
+            isOneToOne: false;
+            referencedRelation: 'uploaded_documents';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'evaluations_job_id_fkey';
             columns: ['job_id'];
             isOneToOne: false;
@@ -99,6 +133,39 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      uploaded_documents: {
+        Row: {
+          file_name: string;
+          file_size: number | null;
+          file_type: string;
+          id: string;
+          metadata: Json | null;
+          mime_type: string | null;
+          storage_path: string;
+          uploaded_at: string | null;
+        };
+        Insert: {
+          file_name: string;
+          file_size?: number | null;
+          file_type: string;
+          id?: string;
+          metadata?: Json | null;
+          mime_type?: string | null;
+          storage_path: string;
+          uploaded_at?: string | null;
+        };
+        Update: {
+          file_name?: string;
+          file_size?: number | null;
+          file_type?: string;
+          id?: string;
+          metadata?: Json | null;
+          mime_type?: string | null;
+          storage_path?: string;
+          uploaded_at?: string | null;
+        };
+        Relationships: [];
       };
     };
     Views: {

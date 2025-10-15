@@ -54,6 +54,21 @@ class EnvironmentVariables {
 
   @IsString()
   SUPABASE_SERVICE_KEY: string;
+
+  @IsString()
+  @IsOptional()
+  SUPABASE_STORAGE_BUCKET: string = 'evaluation-documents';
+
+  // Redis
+  @IsString()
+  REDIS_HOST: string;
+
+  @IsNumber()
+  REDIS_PORT: number;
+
+  @IsString()
+  @IsOptional()
+  REDIS_PASSWORD?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
