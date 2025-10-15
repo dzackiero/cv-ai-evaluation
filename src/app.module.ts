@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
+import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import validateEnv from './config/env.config';
 
 @Module({
@@ -10,6 +11,7 @@ import validateEnv from './config/env.config';
       validate: validateEnv,
       envFilePath: '.env',
     }),
+    EvaluationsModule,
   ],
   controllers: [AppController],
 })

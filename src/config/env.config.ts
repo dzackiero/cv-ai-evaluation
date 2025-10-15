@@ -33,6 +33,17 @@ class EnvironmentVariables {
 
   @IsString()
   APP_URL: string;
+
+  // OpenAI
+  @IsString()
+  OPENAI_API_KEY: string;
+
+  // Qdrant
+  @IsString()
+  QDRANT_API_KEY: string;
+
+  @IsString()
+  QDRANT_URL: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

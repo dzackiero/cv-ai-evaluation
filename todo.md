@@ -1,7 +1,8 @@
 ## RAG
 
-- [ ] PDF upload and parsing
-- [ ] Text chunking and embedding and storing in vector DB
+- [x] PDF upload and parsing
+- [x] Text chunking and embedding and storing in vector DB
+- [x] Retrieval function
 
 ## CV Evaluation
 
