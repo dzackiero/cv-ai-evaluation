@@ -1,18 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { ConfigService } from '@nestjs/config';
 import { QdrantVectorStore } from '@langchain/qdrant';
-
-export enum DocumentType {
-  JobDescription = 'job_description',
-  CaseStudyBrief = 'case_study_brief',
-  ScoringRubric = 'scoring_rubric',
-}
+import { TempFileManager } from '../../../utils/temp-file.util';
+import { DocumentType } from 'src/modules/types/document-type.enum';
 
 @Injectable()
 export class InternalDocumentsService {
@@ -50,7 +43,10 @@ export class InternalDocumentsService {
 
       return vectorStore;
     } catch (error) {
-      this.logger.error('Failed to initialize vector store:', error);
+      this.logger.error(
+        '[Vector Store] Failed to initialize vector store:',
+        error,
+      );
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Vector store initialization failed: ${errorMessage}`);
@@ -61,49 +57,45 @@ export class InternalDocumentsService {
     documentType: DocumentType,
     document: Express.Multer.File,
   ) {
-    const tempDir = os.tmpdir();
-    const tempFilePath = path.join(
-      tempDir,
-      `temp-${Date.now()}-${document.originalname}`,
+    return await TempFileManager.withTempFile(
+      document,
+      'internal-doc',
+      async (tempFilePath) => {
+        this.logger.log(
+          `[Document Store] Storing document: ${document.originalname} (Type: ${documentType})`,
+        );
+
+        const loader = new PDFLoader(tempFilePath);
+        const docs = await loader.load();
+        const splitter = new RecursiveCharacterTextSplitter({
+          chunkSize: 800,
+          chunkOverlap: 200,
+        });
+        const splittedDocs = await splitter.splitDocuments(docs);
+        const enrichedDocs = splittedDocs.map((doc, idx) => {
+          doc.metadata = {
+            ...doc.metadata,
+            document_type: documentType,
+            filename: document.originalname,
+            chunk_index: idx,
+          };
+          return doc;
+        });
+
+        const vectorStore = await this.getVectorStore();
+        await vectorStore.addDocuments(enrichedDocs);
+        this.logger.log(
+          `[Document Store] Successfully stored ${enrichedDocs.length} chunks from: ${document.originalname}`,
+        );
+      },
     );
-
-    try {
-      this.logger.log(`Storing internal document: ${document.originalname}`);
-      fs.writeFileSync(tempFilePath, document.buffer);
-
-      const loader = new PDFLoader(tempFilePath);
-      const docs = await loader.load();
-      const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 800,
-        chunkOverlap: 200,
-      });
-      const splittedDocs = await splitter.splitDocuments(docs);
-      const enrichedDocs = splittedDocs.map((doc, idx) => {
-        doc.metadata = {
-          ...doc.metadata,
-          document_type: documentType,
-          filename: document.originalname,
-          chunk_index: idx,
-        };
-        return doc;
-      });
-
-      const vectorStore = await this.getVectorStore();
-      await vectorStore.addDocuments(enrichedDocs);
-      this.logger.log(
-        `Successfully stored document with ${enrichedDocs.length} chunks.`,
-      );
-    } finally {
-      try {
-        fs.unlinkSync(tempFilePath);
-      } catch (error) {
-        this.logger.error('Error cleaning up temporary file:', error);
-      }
-    }
   }
 
   async queryInternalDocuments(query: string, filter: string | undefined) {
     try {
+      this.logger.log(
+        `[Document Query] Searching for: "${query}" (Filter: ${filter || 'none'})`,
+      );
       const vectorStore = await this.getVectorStore();
       const results = await vectorStore.similaritySearch(query, 10);
       const filteredResults = results
@@ -136,9 +128,15 @@ export class InternalDocumentsService {
         Focus on documents that match with query and return a concise factual summary:
       `);
 
+      this.logger.log(
+        `[Document Query] Successfully retrieved and summarized results`,
+      );
       return result.content;
     } catch (error) {
-      this.logger.error('Error querying internal documents:', error);
+      this.logger.error(
+        `[Document Query] Error querying documents for: "${query}"`,
+        error,
+      );
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to query internal documents: ${errorMessage}`);

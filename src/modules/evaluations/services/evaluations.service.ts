@@ -7,9 +7,7 @@ import { EvaluationSchema } from '../schemas/evaluations.schema';
 import { projectReportSchema } from '../schemas/project-report.schema';
 import { OverallEvaluationSchema } from '../schemas/overall-evaluation.schema';
 import z, { ZodSchema } from 'zod';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { TempFileManager } from '../../../utils/temp-file.util';
 
 @Injectable()
 export class EvaluationsService {
@@ -23,50 +21,38 @@ export class EvaluationsService {
     document: Express.Multer.File,
     schema: T,
   ): Promise<z.infer<T>> {
-    const tempDir = os.tmpdir();
-    const cvTempFilePath = path.join(
-      tempDir,
-      `cv-${Date.now()}-${document.originalname}`,
+    return await TempFileManager.withTempFile(
+      document,
+      'document',
+      async (tempFilePath) => {
+        const documentLoader = new PDFLoader(tempFilePath);
+        const doc = (await documentLoader.load())
+          .map((doc) => doc.pageContent)
+          .join('\n\n');
+
+        const model = new ChatOpenAI({ model: 'gpt-4o-mini' });
+        const structuredModel = model.withStructuredOutput(schema);
+        const docAnalysis = (await structuredModel.invoke(`
+          You are a precise information extraction system.
+
+          Extract and structure the following document content according to the provided schema **exactly**.
+          - Do not infer or fabricate any information not present in the text.
+          - If information is missing, mark it clearly as null or "Not provided".
+          - Maintain field naming and hierarchy exactly as defined by the schema.
+          - Ensure that any date, experience, or skill extracted is represented truthfully and in plain text.
+
+          Document Content:
+          ${doc}
+        `)) as T;
+        return docAnalysis;
+      },
     );
-
-    try {
-      this.logger.log(`Processing CV: ${document.originalname}`);
-      fs.writeFileSync(cvTempFilePath, document.buffer);
-
-      const documentLoader = new PDFLoader(cvTempFilePath);
-      const doc = (await documentLoader.load())
-        .map((doc) => doc.pageContent)
-        .join('\n\n');
-
-      const model = new ChatOpenAI({ model: 'gpt-4o-mini' });
-      const structuredModel = model.withStructuredOutput(schema);
-      const docAnalysis = (await structuredModel.invoke(`
-You are a precise information extraction system.
-
-Extract and structure the following document content according to the provided schema **exactly**.
-- Do not infer or fabricate any information not present in the text.
-- If information is missing, mark it clearly as null or "Not provided".
-- Maintain field naming and hierarchy exactly as defined by the schema.
-- Ensure that any date, experience, or skill extracted is represented truthfully and in plain text.
-
-Document Content:
-${doc}
-`)) as T;
-      return docAnalysis;
-    } finally {
-      try {
-        if (fs.existsSync(cvTempFilePath)) {
-          fs.unlinkSync(cvTempFilePath);
-          this.logger.log(`Cleaned up CV temp file: ${cvTempFilePath}`);
-        }
-      } catch (error) {
-        this.logger.error('Error cleaning up CV temporary file:', error);
-      }
-    }
   }
 
   async evaluateCv(document: Express.Multer.File) {
-    this.logger.log(`Evaluating CV: ${document.originalname}`);
+    this.logger.log(
+      `[CV Evaluation] Starting evaluation: ${document.originalname}`,
+    );
 
     const [cvData, scoringRubric, jobDescription] = await Promise.all([
       this.extractDocumentToStructure(document, curriculumVitaeSchema),
@@ -80,42 +66,49 @@ ${doc}
       ),
     ]);
 
-    this.logger.log(`evaluating CV against rubric and job description`);
+    this.logger.log(
+      `[CV Evaluation] CV data extracted, scoring against rubric and job description`,
+    );
     const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
     const structuredModel = model.withStructuredOutput(EvaluationSchema);
     const evaluation = await structuredModel.invoke(`
-You are an expert **technical recruiter and hiring evaluator**.
-Your goal is to **critically assess** the candidate's suitability for the given job role using the provided scoring rubric and job description.
+      You are an expert **technical recruiter and hiring evaluator**.
+      Your goal is to **critically assess** the candidate's suitability for the given job role using the provided scoring rubric and job description.
 
-**Instructions:**
-- Be **objective, evidence-based, and unsparing**.
-- Only reward experience or skills that directly align with the job requirements.
-- Penalize unrelated work experience or vague claims of skill.
-- If the CV lacks specific proof (e.g., measurable impact, concrete projects, or tools used), deduct points.
-- Identify red flags such as career gaps, role mismatches, or lack of domain relevance.
-- Justify every score with a **short, factual explanation** grounded in the CV.
-- Avoid positive bias or generic praise.
+      **Instructions:**
+      - Be **objective, evidence-based, and unsparing**.
+      - Only reward experience or skills that directly align with the job requirements.
+      - Penalize unrelated work experience or vague claims of skill.
+      - If the CV lacks specific proof (e.g., measurable impact, concrete projects, or tools used), deduct points.
+      - Identify red flags such as career gaps, role mismatches, or lack of domain relevance.
+      - Justify every score with a **short, factual explanation** grounded in the CV.
+      - Avoid positive bias or generic praise.
 
-**inputs:**
+      **inputs:**
 
-CV Data:
-${JSON.stringify(cvData, null, 2)}
+      CV Data:
+      ${JSON.stringify(cvData, null, 2)}
 
-Scoring Rubric:
-${scoringRubric as string}
+      Scoring Rubric:
+      ${scoringRubric as string}
 
-Job Description:
-${jobDescription as string}
+      Job Description:
+      ${jobDescription as string}
 
-**Output:**
-Provide a complete structured evaluation strictly following the schema, reflecting a fair but **critical assessment** of the candidate’s real fit.
+      **Output:**
+      Provide a complete structured evaluation strictly following the schema, reflecting a fair but **critical assessment** of the candidate's real fit.
     `);
 
+    this.logger.log(
+      `[CV Evaluation] Completed evaluation: ${document.originalname}`,
+    );
     return { ...evaluation };
   }
 
   async evaluateProject(document: Express.Multer.File) {
-    this.logger.log(`Evaluating Project: ${document.originalname}`);
+    this.logger.log(
+      `[Project Evaluation] Starting evaluation: ${document.originalname}`,
+    );
 
     const [projectData, scoringRubric, studyBrief] = await Promise.all([
       this.extractDocumentToStructure(document, projectReportSchema),
@@ -129,42 +122,50 @@ Provide a complete structured evaluation strictly following the schema, reflecti
       ),
     ]);
 
-    this.logger.log(`evaluating project against rubric and study brief`);
+    this.logger.log(
+      `[Project Evaluation] Project data extracted, scoring against rubric and study brief`,
+    );
     const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
     const structuredModel = model.withStructuredOutput(EvaluationSchema);
     const evaluation = await structuredModel.invoke(`
-You are a senior evaluator assessing a candidate's **technical project submission** for a recruitment case study.
+      You are a senior evaluator assessing a candidate's **technical project submission** for a recruitment case study.
 
-**Instructions:**
-- Evaluate the project strictly using the provided **scoring rubric** and **study brief**.
-- Be **critical and evidence-based**: do not assume quality if not explicitly demonstrated.
-- Deduct points for:
-  - Missing deliverables
-  - Unclear structure or lack of implementation detail
-  - Weak technical justification
-  - Poor communication or documentation quality
-- Reward only **verifiable competence**, clarity, and depth.
-- Provide specific and critical reasoning for each score or comment.
+      **Instructions:**
+      - Evaluate the project strictly using the provided **scoring rubric** and **study brief**.
+      - Be **critical and evidence-based**: do not assume quality if not explicitly demonstrated.
+      - Deduct points for:
+        - Missing deliverables
+        - Unclear structure or lack of implementation detail
+        - Weak technical justification
+        - Poor communication or documentation quality
+      - Reward only **verifiable competence**, clarity, and depth.
+      - Provide specific and critical reasoning for each score or comment.
 
-**Inputs:**
-Project Data: ${JSON.stringify(projectData, null, 2)}
+      **Inputs:**
+      Project Data: ${JSON.stringify(projectData, null, 2)}
 
-Scoring Rubric:
-${scoringRubric as string}
+      Scoring Rubric:
+      ${scoringRubric as string}
 
-Study Brief:
-${studyBrief as string}
+      Study Brief:
+      ${studyBrief as string}
 
-Provide the evaluation as per the schema.
-`);
+      Provide the evaluation as per the schema.
+    `);
 
+    this.logger.log(
+      `[Project Evaluation] Completed evaluation: ${document.originalname}`,
+    );
     return { projectData, evaluation };
   }
 
-  async finalEvaluation(
+  async evaluation(
     cvDocument: Express.Multer.File,
     projectDocument: Express.Multer.File,
   ) {
+    this.logger.log(
+      `[Evaluation] Starting combined evaluation for CV and Project`,
+    );
     const [cvEvaluation, projectEvaluation] = await Promise.all([
       this.evaluateCv(cvDocument),
       this.evaluateProject(projectDocument),
@@ -176,35 +177,34 @@ Provide the evaluation as per the schema.
         'scoring_rubric',
       );
 
-    console.log('overallRubric', overallRubric);
-
-    this.logger.log(`computing final overall evaluation`);
+    this.logger.log(`[Evaluation] Computing final overall score`);
     const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
     const structuredModel = model.withStructuredOutput(OverallEvaluationSchema);
     const finalEvaluation = await structuredModel.invoke(`
-You are a scoring calculator.
-Your task is to compute the **final overall evaluation** based strictly on the provided *scoring rubric*, which is retrieved from RAG and summarized below.
+      You are a scoring calculator.
+      Your task is to compute the **final overall evaluation** based strictly on the provided *scoring rubric*, which is retrieved from RAG and summarized below.
 
-Do NOT invent new weights or criteria.
-All calculations must follow the weights and scales exactly as described in the rubric text.
+      Do NOT invent new weights or criteria.
+      All calculations must follow the weights and scales exactly as described in the rubric text.
 
----
+      ---
 
-**Inputs:**
+      **Inputs:**
 
-CV Evaluation:
-${JSON.stringify(cvEvaluation, null, 2)}
+      CV Evaluation:
+      ${JSON.stringify(cvEvaluation, null, 2)}
 
-Project Evaluation:
-${JSON.stringify(projectEvaluation, null, 2)}
+      Project Evaluation:
+      ${JSON.stringify(projectEvaluation, null, 2)}
 
-Overall Scoring Rubric:
-${overallRubric as string}
+      Overall Scoring Rubric:
+      ${overallRubric as string}
 
-**Output:**
-Provide the final evaluation in strict JSON according to the schema.
-`);
+      **Output:**
+      Provide the evaluation in strict JSON according to the schema.
+    `);
 
+    this.logger.log(`[Evaluation] Completed combined evaluation`);
     return { result: finalEvaluation };
   }
 }

@@ -8,10 +8,7 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import {
-  DocumentType,
-  InternalDocumentsService,
-} from './services/internal-documents.service';
+import { InternalDocumentsService } from './services/internal-documents.service';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 import {
   FileFieldsInterceptor,
@@ -19,6 +16,7 @@ import {
 } from '@nestjs/platform-express';
 import { UploadInternalDocumentsDto } from './dto/upload-internal-documents.dto';
 import { EvaluationsService } from './services/evaluations.service';
+import { DocumentType } from '../types/document-type.enum';
 
 @Controller('evaluations')
 export class EvaluationsController {
@@ -129,7 +127,7 @@ export class EvaluationsController {
       projectDocument: Express.Multer.File[];
     },
   ) {
-    return await this.evaluationsService.finalEvaluation(
+    return await this.evaluationsService.evaluation(
       files.cvDocument[0],
       files.projectDocument[0],
     );

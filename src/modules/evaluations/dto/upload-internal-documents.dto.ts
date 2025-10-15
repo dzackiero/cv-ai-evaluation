@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty } from 'class-validator';
-import { DocumentType } from '../services/internal-documents.service';
+import { DocumentType } from 'src/modules/types/document-type.enum';
 
 export class UploadInternalDocumentsDto {
   @ApiProperty({ enum: DocumentType })
