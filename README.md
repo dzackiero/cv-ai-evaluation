@@ -1,98 +1,158 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# CV AI Evaluation
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+An AI-powered evaluation service that intelligently analyzes CVs and project reports against job requirements. The service uses vector embeddings and semantic search to provide comprehensive candidate assessments.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- **Document Storage & Embedding**: Store and vectorize job descriptions, requirements, and internal documents for semantic search
+- **CV & Project Report Analysis**: Upload and evaluate candidate documents against job criteria
+- **AI-Powered Evaluation**: Leverage OpenAI and LangChain for intelligent document analysis
+- **Asynchronous Processing**: Background job processing with BullMQ for handling large document evaluations
+- **RESTful API**: Well-documented API endpoints with Swagger/OpenAPI documentation
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
 
-## Project setup
+- **[Nest.js](https://nestjs.com/)** - Progressive Node.js framework
+- **[OpenAI](https://openai.com/)** - AI-powered text analysis
+- **[LangChain](https://www.langchain.com/)** - AI application framework
+- **[Qdrant](https://qdrant.tech/)** - Vector database for semantic search
+- **[Supabase](https://supabase.com/)** - Backend services and storage
+- **[BullMQ](https://docs.bullmq.io/)** - Redis-based queue for background jobs
+
+## Prerequisites
+
+- Node.js (v18 or higher)
+- pnpm (v8 or higher)
+- Redis (for BullMQ)
+- Qdrant instance
+- Supabase account
+- OpenAI API key
+
+## Setup
+
+### 1. Install Dependencies
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+### 2. Environment Configuration
+
+Copy `.env.example` to `.env` and configure the required environment variables:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+Make sure to fill in:
+
+- OpenAI API credentials
+- Supabase URL and keys
+- Qdrant connection details
+- Redis connection string
+- Other service-specific configurations
+
+### 3. Generate Supabase Types
 
 ```bash
-# unit tests
-$ pnpm run test
+pnpm run supabase:types
+```
 
-# e2e tests
-$ pnpm run test:e2e
+### 4. Run Development Server
 
-# test coverage
-$ pnpm run test:cov
+```bash
+pnpm run start:dev
+```
+
+The API will be available at `http://localhost:3000`
+API documentation: `http://localhost:3000/docs`
+
+## Build & Production
+
+### Build for Production
+
+```bash
+pnpm run build
+```
+
+### Run Production Build
+
+```bash
+pnpm run start:prod
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Using PM2
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Install PM2 globally
+npm install -g pm2
+
+# Start the application
+pm2 start dist/main.js --name cv-ai-evaluation
+
+# Save PM2 configuration
+pm2 save
+
+# Setup PM2 to start on system boot
+pm2 startup
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Using Docker/Podman
 
-## Resources
+First, ensure Docker or Podman is installed on your system. Then build and run:
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+# Build the image (use 'docker' or 'podman')
+podman build -t cv-ai-evaluation .
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Run the container with environment file
+podman run -p 3000:3000 --env-file .env cv-ai-evaluation
 
-## Support
+# Or run with environment variables directly
+podman run -p 3000:3000 \
+  -e OPENAI_API_KEY=your_key \
+  -e SUPABASE_URL=your_url \
+  cv-ai-evaluation
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+For production with docker-compose, create a `docker-compose.yml`:
 
-## Stay in touch
+```yaml
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Then run: `docker-compose up -d`
 
-## License
+## Scripts
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `pnpm run start:dev` - Start development server with hot reload
+- `pnpm run build` - Build for production
+- `pnpm run start:prod` - Run production build
+- `pnpm run lint` - Lint and fix code
+- `pnpm run format` - Format code with Prettier
+- `pnpm run test` - Run tests
+- `pnpm run supabase:types` - Generate TypeScript types from Supabase
+
+## Design Choices
+
+### Architecture
+
+- **Modular Design**: Organized into feature modules (evaluations, common, config) for maintainability
+- **Queue-Based Processing**: Background jobs handle time-intensive AI evaluations without blocking API responses
+- **Vector Search**: Semantic search capabilities for intelligent document matching
+
+### Storage Strategy
+
+- **Supabase**: Primary data storage and file management
+- **Qdrant**: Vector embeddings for semantic search and similarity matching
+- **Redis**: Transient data and job queue management

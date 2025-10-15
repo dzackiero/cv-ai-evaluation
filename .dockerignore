@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+npm-debug.log
+pnpm-debug.log
+yarn-error.log
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
+tmp
+temp
+
+# Documentation
+README.md
+*.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Migration and scripts (optional - uncomment if you don't need them in the image)
+# migrations
+# scripts

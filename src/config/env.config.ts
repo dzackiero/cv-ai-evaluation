@@ -15,18 +15,9 @@ export enum Environment {
   Staging = 'staging',
 }
 
-export enum LogFormat {
-  Text = 'text',
-  Json = 'json',
-}
-
 class EnvironmentVariables {
   @IsEnum(Environment)
   NODE_ENV: Environment = Environment.Development;
-
-  @IsEnum(LogFormat)
-  @IsOptional()
-  LOG_FORMAT: LogFormat = LogFormat.Text;
 
   @IsNumber()
   PORT: number;
