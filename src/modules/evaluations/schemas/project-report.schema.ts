@@ -20,6 +20,7 @@ const resultSchema = z.object({
 export const projectReportSchema = z.object({
   projectTitle: z.string().describe('The title of the project'),
   candidate: candidateSchema.describe('Information about the candidate'),
+  github_repository: z.string().describe('Link to the GitHub repository'),
   approaches: z
     .array(approachSchema)
     .describe('Information about the project approaches and designs'),

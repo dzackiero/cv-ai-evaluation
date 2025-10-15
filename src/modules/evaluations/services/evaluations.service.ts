@@ -8,6 +8,8 @@ import * as os from 'os';
 import z, { ZodSchema } from 'zod';
 import { curriculumVitaeSchema } from '../schemas/curriculum-vitae.schema';
 import { EvaluationSchema } from '../schemas/evaluations.schema';
+import { projectReportSchema } from '../schemas/project-report.schema';
+import { OverallEvaluationSchema } from '../schemas/overall-evaluation.schema';
 
 @Injectable()
 export class EvaluationsService {
@@ -56,26 +58,18 @@ export class EvaluationsService {
 
   async evaluateCv(document: Express.Multer.File) {
     this.logger.log(`Evaluating CV: ${document.originalname}`);
-    const cvData = await this.extractDocumentToStructure(
-      document,
-      curriculumVitaeSchema,
-    );
 
-    this.logger.log(
-      `Retrieving scoring rubric and job description for evaluation.`,
-    );
-    const scoringRubric =
-      await this.internalDocumentsService.queryInternalDocuments(
+    const [cvData, scoringRubric, jobDescription] = await Promise.all([
+      this.extractDocumentToStructure(document, curriculumVitaeSchema),
+      this.internalDocumentsService.queryInternalDocuments(
         'Scoring Rubric for Evaluating CV',
         'scoring_rubric',
-      );
-
-    this.logger.log(`Retrieving job description for evaluation.`);
-    const jobDescription =
-      await this.internalDocumentsService.queryInternalDocuments(
+      ),
+      this.internalDocumentsService.queryInternalDocuments(
         'Job Description for Product Engineer (Backend)',
         'project_brief',
-      );
+      ),
+    ]);
 
     this.logger.log(`evaluating CV against rubric and job description`);
     const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
@@ -91,5 +85,74 @@ export class EvaluationsService {
     `);
 
     return { cvData, evaluation };
+  }
+
+  async evaluateProject(document: Express.Multer.File) {
+    this.logger.log(`Evaluating Project: ${document.originalname}`);
+
+    const [projectData, scoringRubric, studyBrief] = await Promise.all([
+      this.extractDocumentToStructure(document, projectReportSchema),
+      this.internalDocumentsService.queryInternalDocuments(
+        'Scoring Rubric for Evaluating Project Deliverables',
+        'scoring_rubric',
+      ),
+      this.internalDocumentsService.queryInternalDocuments(
+        'Case Study Brief',
+        'case_study_brief',
+      ),
+    ]);
+
+    this.logger.log(`evaluating project against rubric and study brief`);
+    const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
+    const structuredModel = model.withStructuredOutput(EvaluationSchema);
+    const evaluation = await structuredModel.invoke(`
+      Based on the following project data, scoring rubric, and study Brief, provide a detailed evaluation of the candidate's suitability for the role.
+      Project Data: ${JSON.stringify(projectData, null, 2)}
+
+      Scoring Rubric:
+      ${scoringRubric as string}
+
+      Study Brief:
+      ${studyBrief as string}
+
+      Provide the evaluation as per the schema.
+    `);
+
+    return { projectData, evaluation };
+  }
+
+  async finalEvaluation(
+    cvDocument: Express.Multer.File,
+    projectDocument: Express.Multer.File,
+  ) {
+    const [cvEvaluation, projectEvaluation] = await Promise.all([
+      this.evaluateCv(cvDocument),
+      this.evaluateProject(projectDocument),
+    ]);
+
+    const overallRubric =
+      await this.internalDocumentsService.queryInternalDocuments(
+        'Overall Scoring Rubric for Candidate Evaluation',
+        'scoring_rubric',
+      );
+
+    const model = new ChatOpenAI({ model: 'gpt-4o', temperature: 0 });
+    const structuredModel = model.withStructuredOutput(OverallEvaluationSchema);
+    const finalEvaluation = await structuredModel.invoke(`
+      Based on the following CV evaluation and project evaluation, provide a comprehensive final evaluation of the candidate's overall suitability for the role.
+
+      CV Evaluation:
+      ${JSON.stringify(cvEvaluation, null, 2)}
+
+      Project Evaluation:
+      ${JSON.stringify(projectEvaluation, null, 2)}
+
+      Overall Scoring Rubric:
+      ${overallRubric as string}
+
+      Provide the final evaluation as per the schema.
+    `);
+
+    return { cvEvaluation, projectEvaluation, finalEvaluation };
   }
 }
